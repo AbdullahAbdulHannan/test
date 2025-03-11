@@ -1,15 +1,14 @@
-const express = require('express');
-const axios = require('axios');
-const cors = require('cors');
-const fs = require('fs');
+const express=require('express')
+const axios=require('axios')
+const cors=require('cors')
 const app = express();
 const PORT = 5000;
 
+// Enable CORS for frontend requests
 app.use(cors());
-app.use(express.json());
 
 // LinkedIn API Credentials
-const accessToken = `EAASbD3SBqFoBO04ZCM9mBXanMAC5XXY4SZBrTWp3wQAmhQ7XLcLumFMduZCAty6bnIrobGcm2KX9r5kE3mVZAI5esETT0XycHzozBQ9mR1N7uvmvA5dCHwnYlitKM8uryZBlXEKZAKdeNZC6a8qUu7dliKoxA3j0zC7dFcKyjbsO1GyAQXqzGnPUzqXCYtYdiwZD`;
+const accessToken = 'AQXvGCW03chqG_itCMPND0wnSYx5-LAw3djys9ywkuyTbZ6OfQ-CBtNs0p2QjohsY4YpBIVf_mOjMfVxW7rW-aPsj1eUT8sdf3YeDnh7dcNbSWcVxVG_0rB25ZLVb-cF-OWXBe-HHx1UG8h9I9GDSMglbACvu58VwnMiPPqOi7b6RjDdfeEp2BC8oaLgod5AmLz02hEYRVmmkc-6sEP2xPyv2QhfeuKyhnLVftwarjNMcvTst3PUvhKB2BGHW6XlWa4vQZ-S7TZ87wBwW3Y_zKDtzNNVJRjdg9mkfcDyg5UhcWCeh1kCC1_c8u-KSD6YMOGZ6UnX-MHtrm-_MEj9ihiz5efwHg';
 const organizationId = '106596928';
 
 // Helper function to get timestamps in milliseconds
