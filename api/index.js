@@ -3,7 +3,7 @@ const express=require('express')
 const axios=require('axios')
 const cors=require('cors')
 const app = express();
-const PORT = 5000;
+const PORT = 6000;
 
 // Enable CORS for frontend requests
 app.use(cors());
@@ -226,5 +226,3 @@ app.post('/api/linkedin/post-text', async (req, res) => {
   }
 });
 
-// Start the server
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
