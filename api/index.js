@@ -1,13 +1,16 @@
-
 const express=require('express')
 const axios=require('axios')
 const cors=require('cors')
 const app = express();
-const PORT = 6000;
-
+const PORT = 5000;
+const multer = require('multer'); // Middleware for handling file uploads
+const upload = multer(); // Configure multer for memory storage
+const fs = require('fs');
 // Enable CORS for frontend requests
 app.use(cors());
-
+// Middleware to parse JSON and multipart form data
+app.use(express.json()); // For JSON payloads
+app.use(express.urlencoded({ extended: true })); // For URL-encoded payloads
 // LinkedIn API Credentials
 const accessToken = 'AQXvGCW03chqG_itCMPND0wnSYx5-LAw3djys9ywkuyTbZ6OfQ-CBtNs0p2QjohsY4YpBIVf_mOjMfVxW7rW-aPsj1eUT8sdf3YeDnh7dcNbSWcVxVG_0rB25ZLVb-cF-OWXBe-HHx1UG8h9I9GDSMglbACvu58VwnMiPPqOi7b6RjDdfeEp2BC8oaLgod5AmLz02hEYRVmmkc-6sEP2xPyv2QhfeuKyhnLVftwarjNMcvTst3PUvhKB2BGHW6XlWa4vQZ-S7TZ87wBwW3Y_zKDtzNNVJRjdg9mkfcDyg5UhcWCeh1kCC1_c8u-KSD6YMOGZ6UnX-MHtrm-_MEj9ihiz5efwHg';
 const organizationId = '106596928';
@@ -156,7 +159,6 @@ app.get('/api/linkedin/engagements', async (req, res) => {
 
 app.get('/api/linkedin/post-engagements', async (req, res) => {
   try {
-    // Step 1: Fetch latest 3 posts
     const postsUrl = `https://api.linkedin.com/v2/posts?q=author&author=urn:li:organization:${organizationId}&count=3`;
     const postsResponse = await axios.get(postsUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -207,22 +209,97 @@ app.get('/api/linkedin/post-engagements', async (req, res) => {
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 
 // Function to post text on LinkedIn
-app.post('/api/linkedin/post-text', async (req, res) => {
+app.post('/api/linkedin/post-text', upload.array('images'), async (req, res) => {
   const { text } = req.body;
+  const images = req.files; // Array of uploaded images
+
+  if (!text && (!images || images.length === 0)) {
+    return res.status(400).json({ error: 'Either text or images are required for the post' });
+  }
+
   try {
-    const { data: user } = await axios.get("https://api.linkedin.com/v2/me", { headers: { Authorization: `Bearer ${accessToken}` } });
-    const userURN = `urn:li:person:${user.id}`;
+    
+    const userURN = `urn:li:organization:${organizationId}`;
+
+    const mediaAssets = [];
+    if (images && images.length > 0) {
+      for (const image of images) {
+        const initializeResponse = await axios.post(
+          "https://api.linkedin.com/v2/assets?action=registerUpload",
+          {
+            registerUploadRequest: {
+              recipes: ["urn:li:digitalmediaRecipe:feedshare-image"],
+              owner: userURN,
+              serviceRelationships: [
+                {
+                  relationshipType: "OWNER",
+                  identifier: "urn:li:userGeneratedContent",
+                },
+              ],
+            },
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        const uploadUrl = initializeResponse.data.value.uploadMechanism[
+          "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"
+        ].uploadUrl;
+        const asset = initializeResponse.data.value.asset;
+
+        await axios.put(uploadUrl, image.buffer, {
+          headers: { "Content-Type": image.mimetype },
+        });
+
+        mediaAssets.push(asset);
+      }
+    }
+
     const postData = {
       author: userURN,
       lifecycleState: "PUBLISHED",
-      specificContent: { "com.linkedin.ugc.ShareContent": { shareCommentary: { text }, shareMediaCategory: "NONE" } },
-      visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" },
+      specificContent: {
+        "com.linkedin.ugc.ShareContent": {
+          shareCommentary: {
+            text: text || "", // Use empty string if no text is provided
+          },
+          shareMediaCategory: images && images.length > 0 ? "IMAGE" : "NONE",
+          media: mediaAssets.map((asset) => ({
+            status: "READY",
+            description: {
+              text: "Uploaded image",
+            },
+            media: asset,
+            title: {
+              text: "Image title",
+            },
+          })),
+        },
+      },
+      visibility: {
+        "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
+      },
     };
-    const response = await axios.post("https://api.linkedin.com/v2/ugcPosts", postData, { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } });
+
+    const response = await axios.post(
+      "https://api.linkedin.com/v2/ugcPosts",
+      postData,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
     res.json(response.data);
   } catch (error) {
-    console.error("LinkedIn post failed:", error.response?.data || error);
-    res.status(500).json({ error: 'Failed to post' });
+    console.error("LinkedIn post failed:", error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to post to LinkedIn' });
   }
 });
 
